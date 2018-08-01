@@ -25,6 +25,7 @@ from vts.runners.host import base_test
 from vts.runners.host import const
 from vts.runners.host import keys
 from vts.runners.host import test_runner
+from vts.utils.python.android import api
 from vts.utils.python.file import target_file_utils
 
 
@@ -76,8 +77,7 @@ class VtsTrebleSysPropTest(base_test.BaseTestClass):
         required_params = [keys.ConfigKeys.IKEY_DATA_FILE_PATH]
         self.getUserParams(required_params)
         self.dut = self.android_devices[0]
-        self.dut.shell.InvokeTerminal( "TrebleSysPropTest")
-        self.shell = self.dut.shell.TrebleSysPropTest
+        self.shell = self.dut.shell
         self._temp_dir = tempfile.mkdtemp()
 
     def tearDownClass(self):
@@ -124,6 +124,10 @@ class VtsTrebleSysPropTest(base_test.BaseTestClass):
 
         Vendor or ODM properties must have their own prefix.
         """
+        asserts.skipIf(
+                self.dut.getLaunchApiLevel() <= api.PLATFORM_API_LEVEL_P,
+                "Skip test for a device which launched first before Android Q.")
+
         logging.info("Checking existence of %s",
                      self._VENDOR_PROPERTY_CONTEXTS_FILE_PATH)
         target_file_utils.assertPermissionsAndExistence(
@@ -143,15 +147,20 @@ class VtsTrebleSysPropTest(base_test.BaseTestClass):
                     property_contexts_file)
         logging.info("Found %d property names in vendor property contexts",
                      len(property_dict))
+        violation_list = []
         for name in property_dict:
             has_proper_namesapce = False
             for prefix in self._VENDOR_OR_ODM_NAMEPACES:
                 if name.startswith(prefix):
                     has_proper_namesapce = True
                     break
-            asserts.assertTrue(
-                    has_proper_namesapce,
-                    "Vendor property (%s) has wrong namespace" % name)
+            if not has_proper_namesapce:
+                violation_list.append(name)
+        asserts.assertEqual(
+                len(violation_list),
+                0,
+                ("Vendor propertes (%s) have wrong namespace" %
+                 (" ".join(sorted(violation_list)))))
 
     def testExportedPlatformPropertyIntegrity(self):
         """Ensures public property contexts isn't modified at all.
