@@ -44,6 +44,7 @@ import org.junit.runner.RunWith;
 @RunWith(DeviceJUnit4ClassRunner.class)
 public class VtsGblHostTest extends BaseHostJUnit4Test {
     private File mTempDir;
+    private CompatibilityBuildHelper mBuildHelper;
 
     @Before
     public final void setUp() throws DeviceNotAvailableException, IOException {
@@ -52,11 +53,21 @@ public class VtsGblHostTest extends BaseHostJUnit4Test {
         assumeThat("GBL version prop", gblVersion, not(-1L));
 
         mTempDir = FileUtil.createTempDir("VtsGblHostTest");
+        mBuildHelper = new CompatibilityBuildHelper(getBuild());
     }
 
     @After
     public final void tearDown() {
         FileUtil.recursiveDelete(mTempDir);
+    }
+
+    private CommandResult logCommandResult(final String name, final CommandResult result) {
+        CLog.i("Result of command: %s", name);
+        CLog.i("Status: %s", result.getStatus());
+        CLog.i("Exit code: %s", result.getExitCode());
+        CLog.i("Stdout: %s", result.getStdout());
+        CLog.i("Stderr: %s", result.getStderr());
+        return result;
     }
 
     @Test
@@ -65,8 +76,8 @@ public class VtsGblHostTest extends BaseHostJUnit4Test {
         final long gblVersion = device.getIntProperty("ro.boot.gbl.version", -1);
         final String gblBuildNumber = device.getProperty("ro.boot.gbl.build_number");
 
-        CLog.i("GBL version: " + gblVersion);
-        CLog.i("GBL build_number: " + gblBuildNumber);
+        CLog.i("GBL version: %s", gblVersion);
+        CLog.i("GBL build_number: %s", gblBuildNumber);
 
         assertNotNull(gblBuildNumber);
 
@@ -80,41 +91,25 @@ public class VtsGblHostTest extends BaseHostJUnit4Test {
             CLog.i("Skipping rest of test because GBL is presubmit build");
             return;
         }
-        final long gblBuildIncremental = Long.parseLong(gblBuildNumber);
     }
 
     @Test
     public void testCertificate() throws DeviceNotAvailableException, IOException {
         ITestDevice device = getDevice();
-        File android_esp = new File(mTempDir, "android_esp");
-        assertTrue("Fetch android_esp partition",
-                device.pullFile("/dev/block/by-name/android_esp", android_esp));
+        File bootEfi = new File(mTempDir, "boot.efi");
+        assertTrue("Pull efisp partition", device.pullFile("/dev/block/by-name/efisp", bootEfi));
 
-        CompatibilityBuildHelper buildHelper = new CompatibilityBuildHelper(getBuild());
-        File mtools = buildHelper.getTestFile("mtools");
-        File boot_efi = new File(mTempDir, "boot.efi");
-        boolean found_efi = false;
-        for (String efi_name : new String[] {"::/EFI/BOOT/BOOTAA64.EFI", "::/EFI/BOOT/BOOTX64.EFI",
-                     "::/EFI/BOOT/BOOTIA32.EFI"}) {
-            boot_efi.delete();
-            CommandResult result = new RunUtil().runTimedCmd(3000, mtools.getAbsolutePath(), "-c",
-                    "mcopy", "-i", android_esp.getAbsolutePath(),
-                    "-n", // Don't complain about overwrite
-                    efi_name, boot_efi.getAbsolutePath());
-            if (CommandStatus.SUCCESS.equals(result.getStatus())) {
-                CLog.i("Found EFI application: " + efi_name);
-                found_efi = true;
-                break;
-            }
-        }
-        assertTrue("Found EFI application", found_efi);
+        File gblsigntool = mBuildHelper.getTestFile("gblsigntool");
+        File gblPublicKey = new File(mBuildHelper.getTestFile("gbl"), "202504/gbl_key_pub.pem");
 
-        // FIXME(b/387241522): Check public key hash.
-        File gblsigntool = buildHelper.getTestFile("gblsigntool");
-        CommandResult result = new RunUtil().runTimedCmd(
-                5000, gblsigntool.getAbsolutePath(), "verify", boot_efi.getAbsolutePath());
-        CLog.i("gblsigntool stdout: " + result.getStdout());
-        assertEquals("gblsigntool stderr: " + result.getStderr(), CommandStatus.SUCCESS,
-                result.getStatus());
+        CommandResult result = logCommandResult("gblsigntool info",
+                new RunUtil().runTimedCmd(
+                        5000, gblsigntool.getAbsolutePath(), "info", bootEfi.getAbsolutePath()));
+        assertEquals("gblsigntool info command", CommandStatus.SUCCESS, result.getStatus());
+
+        result = logCommandResult("gblsigntool verify",
+                new RunUtil().runTimedCmd(5000, gblsigntool.getAbsolutePath(), "verify",
+                        bootEfi.getAbsolutePath(), "--key", gblPublicKey.getAbsolutePath()));
+        assertEquals("gblsigntool verify command", CommandStatus.SUCCESS, result.getStatus());
     }
 }

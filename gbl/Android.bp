@@ -27,8 +27,10 @@ java_test_host {
         "tradefed",
         "compatibility-tradefed",
     ],
+    data: [
+        ":gbl_keystore_keys",
+    ],
     data_native_bins: [
-        "mtools",
         "gblsigntool",
     ],
     test_suites: [
