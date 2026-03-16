@@ -313,7 +313,7 @@ GetSystemHashtreeDescriptor(
     return nullptr;
   }
 
-  if (!ValidatePublicKeyBlob(out_public_key_data, /*is_validating_gki_key=*/false)) {
+  if (!ValidatePublicKeyBlob(out_public_key_data)) {
     ALOGE("The GSI image is not signed by an official key");
     return nullptr;
   }

@@ -89,8 +89,7 @@ class ShaHasherImpl : public ShaHasher {
 std::unique_ptr<ShaHasher> CreateShaHasher(const std::string &algorithm);
 
 // Checks whether the public key is an official GSI key or not.
-bool ValidatePublicKeyBlob(const std::string &key_blob_to_validate,
-                           const bool is_validating_gki_key);
+bool ValidatePublicKeyBlob(const std::string &key_blob_to_validate);
 
 uint32_t GetSdkLevel();
 
