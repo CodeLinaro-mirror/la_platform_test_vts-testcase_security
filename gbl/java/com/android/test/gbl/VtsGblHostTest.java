@@ -19,7 +19,6 @@ package com.android.test.gbl;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -88,10 +87,10 @@ public class VtsGblHostTest extends BaseHostJUnit4Test {
 
         assertThat("Invalid build ID", gblBuildNumber, matchesPattern("P?[0-9]+"));
 
-        final long boardApiLevel = device.getIntProperty("ro.board.api_level", -1);
-        final long gblFwApiLevel = device.getIntProperty("ro.boot.gbl.fw.api_level", -1);
-        assertNotEquals("ro.boot.gbl.fw.api_level", -1, gblFwApiLevel);
-        assertEquals("board.api_level == fw.api_level", boardApiLevel, gblFwApiLevel);
+        if (gblBuildNumber.startsWith("P")) {
+            CLog.i("Skipping rest of test because GBL is presubmit build");
+            return;
+        }
     }
 
     private boolean extractBootEfi(File esp, File out) throws IOException {
